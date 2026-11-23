@@ -1,4 +1,4 @@
-# LiftSafe - Paso 3: pruebas de calculos.py con los valores de referencia del README.
+# LiftSafe - Paso 4: pruebas de calculos.py con los valores de referencia del README.
 # Se ejecuta con:  .\.venv\Scripts\python src\pruebas.py
 import calculos
 
@@ -9,6 +9,15 @@ def comparar(nombre, calculado, esperado, tolerancia):
         print("  OK    ", nombre, "=", round(calculado, 3))
         return 0
     print("  ERROR ", nombre, "calculado", round(calculado, 3), "esperado", esperado)
+    return 1
+
+
+def comparar_texto(nombre, calculado, esperado):
+    """Compara dos textos. Devuelve 0 si son iguales y 1 si no."""
+    if calculado == esperado:
+        print("  OK    ", nombre, "=", calculado)
+        return 0
+    print("  ERROR ", nombre, "calculado", calculado, "esperado", esperado)
     return 1
 
 
@@ -29,6 +38,18 @@ def probar_caso(nombre, masa_kg, x_a_m, x_g_m, x_b_m, altura_m,
     return errores
 
 
+def probar_clasificacion():
+    """Prueba los límites de los colores: lejos, justo en el límite y justo por encima."""
+    print("Clasificación por porcentaje de capacidad")
+    errores = 0
+    errores = errores + comparar_texto("50 %", calculos.clasificar_eslinga(50.0), "verde")
+    errores = errores + comparar_texto("80 %", calculos.clasificar_eslinga(80.0), "verde")
+    errores = errores + comparar_texto("80.1 %", calculos.clasificar_eslinga(80.1), "ambar")
+    errores = errores + comparar_texto("100 %", calculos.clasificar_eslinga(100.0), "ambar")
+    errores = errores + comparar_texto("100.1 %", calculos.clasificar_eslinga(100.1), "rojo")
+    return errores
+
+
 total_errores = 0
 total_errores = total_errores + probar_caso(
     "1. CG centrado", 2000, 0.0, 1.0, 2.0, 1.0, 13.873, 13.873, 45.0, 45.0)
@@ -38,6 +59,7 @@ total_errores = total_errores + probar_caso(
     "3. Simétrico a 30 grados", 1000, 0.0, 1.0, 2.0, 0.57735, 9.810, 9.810, 30.0, 30.0)
 total_errores = total_errores + probar_caso(
     "4. Simétrico a 60 grados", 1000, 0.0, 1.0, 2.0, 1.73205, 5.664, 5.664, 60.0, 60.0)
+total_errores = total_errores + probar_clasificacion()
 
 print()
 if total_errores == 0:
