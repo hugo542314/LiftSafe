@@ -1,4 +1,5 @@
-# LiftSafe - Paso 5: programa interactivo (botones + y - con el ratón, y teclado).
+# LiftSafe - Paso 6: comprobar los datos, avisar y explicar el resultado.
+import textwrap
 import pygame
 import calculos
 
@@ -17,7 +18,9 @@ alto_carga_m = 0.6
 MASA_MIN_KG = 500
 MASA_MAX_KG = 5000
 PASO_MASA_KG = 250
-PASO_CG_M = 0.1          # el CG solo se mueve entre A y B
+CG_MIN_M = x_izq_carga_m                  # el CG puede salirse de A y B, pero no de la carga
+CG_MAX_M = x_izq_carga_m + largo_carga_m
+PASO_CG_M = 0.1
 ALTURA_MIN_M = 0.2
 ALTURA_MAX_M = 1.6
 PASO_ALTURA_M = 0.1
@@ -46,6 +49,7 @@ COLOR_CARGA = (205, 205, 198)
 COLOR_LINEA = (40, 40, 40)
 COLOR_TEXTO = (40, 40, 40)
 COLOR_GRIS = (110, 110, 110)
+COLOR_NO_VALIDO = (150, 150, 150)
 COLOR_BOTON = (235, 235, 230)
 COLOR_SELECCION = (222, 235, 250)
 COLOR_CG = (198, 40, 40)
@@ -108,6 +112,7 @@ fuente = pygame.font.SysFont("arial", 22)
 fuente_control = pygame.font.SysFont("arial", 20)
 fuente_pequena = pygame.font.SysFont("arial", 16)
 fuente_negrita = pygame.font.SysFont("arial", 24, bold=True)
+fuente_aviso = pygame.font.SysFont("arial", 17, bold=True)
 
 # --- Bucle principal ----------------------------------------------------
 seleccionado = 0         # control elegido con el teclado: 0 masa, 1 CG, 2 altura, 3 capacidad
@@ -145,7 +150,7 @@ while ejecutando:
     if parametro == 0:
         masa_kg = limitar(masa_kg + direccion * PASO_MASA_KG, MASA_MIN_KG, MASA_MAX_KG)
     elif parametro == 1:
-        x_g_m = round(limitar(x_g_m + direccion * PASO_CG_M, x_a_m, x_b_m), 1)
+        x_g_m = round(limitar(x_g_m + direccion * PASO_CG_M, CG_MIN_M, CG_MAX_M), 1)
     elif parametro == 2:
         altura_gancho_m = round(
             limitar(altura_gancho_m + direccion * PASO_ALTURA_M, ALTURA_MIN_M, ALTURA_MAX_M), 1)
@@ -153,19 +158,36 @@ while ejecutando:
         capacidad_kn = limitar(
             capacidad_kn + direccion * PASO_CAPACIDAD_KN, CAPACIDAD_MIN_KN, CAPACIDAD_MAX_KN)
 
-    # 3. Calcular con las funciones de calculos.py (todo en unidades del SI)
-    peso_n = calculos.calcular_peso_n(masa_kg)
-    tension_a_n = calculos.calcular_tension_a_n(peso_n, x_a_m, x_g_m, x_b_m, altura_gancho_m)
-    tension_b_n = calculos.calcular_tension_b_n(peso_n, x_a_m, x_g_m, x_b_m, altura_gancho_m)
-    angulo_a_grados = calculos.calcular_angulo_a_grados(x_a_m, x_g_m, altura_gancho_m)
-    angulo_b_grados = calculos.calcular_angulo_b_grados(x_g_m, x_b_m, altura_gancho_m)
+    # 3. Comprobar los datos antes de calcular
     capacidad_n = capacidad_kn * 1000
-    porcentaje_a = calculos.calcular_porcentaje_capacidad(tension_a_n, capacidad_n)
-    porcentaje_b = calculos.calcular_porcentaje_capacidad(tension_b_n, capacidad_n)
-    color_a = color_de_estado(calculos.clasificar_eslinga(porcentaje_a))
-    color_b = color_de_estado(calculos.clasificar_eslinga(porcentaje_b))
+    izado_ok = calculos.izado_valido(x_a_m, x_g_m, x_b_m, altura_gancho_m, capacidad_n)
 
-    # 4. Convertir de metros a píxeles (los píxeles solo se usan para dibujar)
+    # 4. Calcular (todo en unidades del SI) o preparar el aviso si los datos no valen
+    if izado_ok:
+        peso_n = calculos.calcular_peso_n(masa_kg)
+        tension_a_n = calculos.calcular_tension_a_n(peso_n, x_a_m, x_g_m, x_b_m, altura_gancho_m)
+        tension_b_n = calculos.calcular_tension_b_n(peso_n, x_a_m, x_g_m, x_b_m, altura_gancho_m)
+        angulo_a_grados = calculos.calcular_angulo_a_grados(x_a_m, x_g_m, altura_gancho_m)
+        angulo_b_grados = calculos.calcular_angulo_b_grados(x_g_m, x_b_m, altura_gancho_m)
+        porcentaje_a = calculos.calcular_porcentaje_capacidad(tension_a_n, capacidad_n)
+        porcentaje_b = calculos.calcular_porcentaje_capacidad(tension_b_n, capacidad_n)
+        color_a = color_de_estado(calculos.clasificar_eslinga(porcentaje_a))
+        color_b = color_de_estado(calculos.clasificar_eslinga(porcentaje_b))
+        texto_tension_a = f"{tension_a_n / 1000:.2f} kN  ({porcentaje_a:.0f} % de uso)"
+        texto_tension_b = f"{tension_b_n / 1000:.2f} kN  ({porcentaje_b:.0f} % de uso)"
+        texto_angulo_a = f"Ángulo: {angulo_a_grados:.1f}°"
+        texto_angulo_b = f"Ángulo: {angulo_b_grados:.1f}°"
+        explicacion = calculos.redactar_explicacion(x_a_m, x_g_m, x_b_m, porcentaje_a, porcentaje_b)
+    else:
+        color_a = COLOR_NO_VALIDO
+        color_b = COLOR_NO_VALIDO
+        texto_tension_a = "Sin calcular"
+        texto_tension_b = "Sin calcular"
+        texto_angulo_a = "Ángulo: —"
+        texto_angulo_b = "Ángulo: —"
+        explicacion = calculos.EXPLICACION_CG_FUERA
+
+    # 5. Convertir de metros a píxeles (los píxeles solo se usan para dibujar)
     x_gancho_m = x_g_m  # el gancho queda en la vertical del CG
     x_a_px = ORIGEN_X_PX + x_a_m * PIXELES_POR_METRO
     x_b_px = ORIGEN_X_PX + x_b_m * PIXELES_POR_METRO
@@ -178,7 +200,7 @@ while ejecutando:
     largo_carga_px = largo_carga_m * PIXELES_POR_METRO
     alto_carga_px = alto_carga_m * PIXELES_POR_METRO
 
-    # 5. Dibujar el fotograma, de atrás hacia delante
+    # 6. Dibujar el fotograma, de atrás hacia delante
     pantalla.fill(COLOR_FONDO)
     rectangulo_carga = (x_carga_px, ORIGEN_Y_PX, largo_carga_px, alto_carga_px)
     pygame.draw.rect(pantalla, COLOR_CARGA, rectangulo_carga)
@@ -193,6 +215,13 @@ while ejecutando:
     escribir(pantalla, fuente_negrita, "A", x_a_px - 8, ORIGEN_Y_PX + 14, COLOR_TEXTO)
     escribir(pantalla, fuente_negrita, "B", x_b_px - 8, ORIGEN_Y_PX + 14, COLOR_TEXTO)
     escribir(pantalla, fuente_negrita, "CG", x_g_px + 16, y_g_px - 12, COLOR_CG)
+
+    # Explicación, debajo de la escena (el texto largo se reparte en varias líneas)
+    escribir(pantalla, fuente_negrita, "Explicación", 30, 524, COLOR_TEXTO)
+    y_linea = 556
+    for linea in textwrap.wrap(explicacion, 64):
+        escribir(pantalla, fuente_control, linea, 30, y_linea, COLOR_TEXTO)
+        y_linea = y_linea + 26
 
     # Panel de controles
     pygame.draw.rect(pantalla, COLOR_PANEL, (670, 20, 310, 250))
@@ -209,22 +238,41 @@ while ejecutando:
     escribir(pantalla, fuente_pequena, "Flechas arriba/abajo: elegir control", PANEL_X_PX, 232, COLOR_GRIS)
     escribir(pantalla, fuente_pequena, "Flechas izquierda/derecha: cambiar", PANEL_X_PX, 250, COLOR_GRIS)
 
-    # Panel de resultados (los números se convierten de N a kN solo para mostrarlos)
+    # Panel de resultados
     pygame.draw.rect(pantalla, COLOR_PANEL, (670, 282, 310, 250))
     pygame.draw.rect(pantalla, COLOR_LINEA, (670, 282, 310, 250), 2)
     escribir(pantalla, fuente_negrita, "Resultados", PANEL_X_PX, 292, COLOR_TEXTO)
 
     pygame.draw.rect(pantalla, color_a, (PANEL_X_PX, 336, 18, 18))
     escribir(pantalla, fuente_negrita, "Eslinga A", PANEL_X_PX + 30, 332, COLOR_TEXTO)
-    escribir(pantalla, fuente, f"{tension_a_n / 1000:.2f} kN  ({porcentaje_a:.0f} % de uso)", PANEL_X_PX, 362, COLOR_TEXTO)
-    escribir(pantalla, fuente, f"Ángulo: {angulo_a_grados:.1f}°", PANEL_X_PX, 388, COLOR_TEXTO)
+    escribir(pantalla, fuente, texto_tension_a, PANEL_X_PX, 362, COLOR_TEXTO)
+    escribir(pantalla, fuente, texto_angulo_a, PANEL_X_PX, 388, COLOR_TEXTO)
 
     pygame.draw.rect(pantalla, color_b, (PANEL_X_PX, 440, 18, 18))
     escribir(pantalla, fuente_negrita, "Eslinga B", PANEL_X_PX + 30, 436, COLOR_TEXTO)
-    escribir(pantalla, fuente, f"{tension_b_n / 1000:.2f} kN  ({porcentaje_b:.0f} % de uso)", PANEL_X_PX, 466, COLOR_TEXTO)
-    escribir(pantalla, fuente, f"Ángulo: {angulo_b_grados:.1f}°", PANEL_X_PX, 492, COLOR_TEXTO)
+    escribir(pantalla, fuente, texto_tension_b, PANEL_X_PX, 466, COLOR_TEXTO)
+    escribir(pantalla, fuente, texto_angulo_b, PANEL_X_PX, 492, COLOR_TEXTO)
 
-    # 6. Mostrar el fotograma y esperar para mantener 60 fotogramas por segundo
+    # Panel de avisos
+    pygame.draw.rect(pantalla, COLOR_PANEL, (670, 542, 310, 82))
+    pygame.draw.rect(pantalla, COLOR_LINEA, (670, 542, 310, 82), 2)
+    escribir(pantalla, fuente_negrita, "Avisos", PANEL_X_PX, 548, COLOR_TEXTO)
+    if izado_ok:
+        aviso_a = calculos.redactar_aviso("A", porcentaje_a)
+        aviso_b = calculos.redactar_aviso("B", porcentaje_b)
+        y_aviso = 576
+        if aviso_a != "":
+            escribir(pantalla, fuente_aviso, aviso_a, PANEL_X_PX, y_aviso, color_a)
+            y_aviso = y_aviso + 22
+        if aviso_b != "":
+            escribir(pantalla, fuente_aviso, aviso_b, PANEL_X_PX, y_aviso, color_b)
+        if aviso_a == "" and aviso_b == "":
+            escribir(pantalla, fuente_aviso, "Sin avisos: hay margen", PANEL_X_PX, y_aviso, COLOR_VERDE)
+    else:
+        escribir(pantalla, fuente_aviso, "CG fuera de A y B", PANEL_X_PX, 576, COLOR_ROJO)
+        escribir(pantalla, fuente_aviso, "Izado no válido: sin cálculo", PANEL_X_PX, 598, COLOR_ROJO)
+
+    # 7. Mostrar el fotograma y esperar para mantener 60 fotogramas por segundo
     pygame.display.flip()
     reloj.tick(FOTOGRAMAS_POR_SEGUNDO)
 

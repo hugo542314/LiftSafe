@@ -73,3 +73,56 @@ def clasificar_eslinga(porcentaje):
     elif porcentaje > UMBRAL_AMBAR_PORCENTAJE:
         return "ambar"
     return "verde"
+
+def izado_valido(x_a_m, x_g_m, x_b_m, altura_m, capacidad_n):
+    """Dice si los datos permiten calcular (CG entre A y B, altura y capacidad positivas)."""
+    if x_a_m >= x_b_m:
+        return False
+    if x_g_m < x_a_m or x_g_m > x_b_m:
+        return False
+    if altura_m <= 0 or capacidad_n <= 0:
+        return False
+    return True
+
+
+def eslinga_mas_cargada(x_a_m, x_g_m, x_b_m):
+    """Devuelve 'A' o 'B' según qué punto de izado esté más cerca del CG, o 'ninguna' si está centrado."""
+    distancia_a_m = x_g_m - x_a_m
+    distancia_b_m = x_b_m - x_g_m
+    if abs(distancia_a_m - distancia_b_m) < 0.05:
+        return "ninguna"
+    elif distancia_a_m < distancia_b_m:
+        return "A"
+    return "B"
+
+
+def redactar_aviso(nombre, porcentaje):
+    """Texto de aviso de una eslinga, o texto vacío si está en verde."""
+    estado = clasificar_eslinga(porcentaje)
+    if estado == "rojo":
+        return f"Eslinga {nombre}: sobrecarga ({porcentaje:.0f} %)"
+    elif estado == "ambar":
+        return f"Eslinga {nombre}: poco margen ({porcentaje:.0f} %)"
+    return ""
+
+
+EXPLICACION_CG_FUERA = "El CG está fuera de A y B: no hay equilibrio y la carga volcaría. Debe quedar entre A y B."
+
+
+def redactar_explicacion(x_a_m, x_g_m, x_b_m, porcentaje_a, porcentaje_b):
+    """Frase que explica el reparto de la carga y qué hacer si queda poco margen."""
+    mas_cargada = eslinga_mas_cargada(x_a_m, x_g_m, x_b_m)
+    if mas_cargada == "ninguna":
+        texto = "El CG está centrado: las dos eslingas soportan la misma tensión."
+    elif mas_cargada == "A":
+        texto = "La eslinga A está más cerca del CG, por eso soporta más tensión que la B."
+    else:
+        texto = "La eslinga B está más cerca del CG, por eso soporta más tensión que la A."
+    estado = clasificar_eslinga(max(porcentaje_a, porcentaje_b))
+    if estado == "rojo":
+        texto = texto + " Alguna supera su capacidad: sube el gancho, reduce la masa o usa eslingas más fuertes."
+    elif estado == "ambar":
+        texto = texto + " Queda poco margen: conviene subir el gancho o reducir la masa."
+    else:
+        texto = texto + " Las dos trabajan con margen."
+    return texto
